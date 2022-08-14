@@ -1,0 +1,104 @@
+﻿@page "/fetchdata/{aggregator}"
+
+<PageTitle>Агрегатор @aggregator</PageTitle>
+
+@using Aggregator.Data
+@inject OrdersSimulatorService SimulatorService
+
+<h1>@aggregator</h1>
+
+<p>Сделайте выбор класса Вашего автомобиля для обновления предложений.</p>
+
+@if (simulators == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="input-group mb-3">
+        <select class="form-select" @onchange=OnParametersSetAsync>
+            @if (types != null)
+                foreach (var t in types)
+                {
+                    <option value="@t">@t</option>
+                }
+        </select>
+        <input type="search" class="form-control" placeholder="Искать адрес" aria-label="search" @bind-value="@search">
+        <button class="input-group-text" @onclick=Refresh><span class="oi oi-magnifying-glass"></span></button>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th class="col-5">Откуда</th>
+                <th class="col-5">Куда</th>
+                <th class="col-2">Действие</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var simulator in simulators)
+            {
+                <tr>
+                    <td><button class="btn btn-light" title="Показать на карте" @onclick="()=>ViewFrom(simulator.Id)"><span class="oi oi-map-marker"></span></button>&nbsp;@simulator.From</td>
+                    <td><button class="btn btn-light" title="Показать на карте" @onclick="()=>ViewTo(simulator.Id)"><span class="oi oi-map-marker"></span></button>&nbsp;@simulator.To</td>
+                    <td><button class="btn btn-@reservedColor[simulator.Id]" title="Резервирование" @onclick="()=>Reservation(simulator.Id)"><span class="oi oi-lock-@reserved[simulator.Id]"></span></button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @((MarkupString)map)
+}
+
+@code {
+    [ParameterAttribute]
+    public string aggregator { get; set; } = string.Empty;
+    private OrdersSimulator[]? simulators;
+    private string[]? types;
+    protected string search = string.Empty;
+    protected Dictionary<int, string> reserved = new();
+    protected Dictionary<int, string> reservedColor = new();
+    protected string map = "<div style=\"position:relative;overflow:hidden;height:30rem;\"><a href=\"https://yandex.ru/maps/213/moscow/?utm_medium=mapframe&utm_source=maps\" style=\"color:#eee;font-size:12px;position:absolute;top:0px;\">Москва</a><a href=\"https://yandex.ru/maps/213/moscow/?bookmarks%5Bpid%5D=home&bookmarks%5Buri%5D=ymapsbm1%3A%2F%2Fpin%3Fll%3D37.587582%252C55.655518&ll=37.594051%2C55.660093&utm_medium=mapframe&utm_source=maps&z=15\" style=\"color:#eee;font-size:12px;position:absolute;top:14px;\">Дом — Яндекс Карты</a><iframe src=\"https://yandex.ru/map-widget/v1/-/CCURRHTEHC\" class=\"w-100 h-100\" frameborder=\"1\" allowfullscreen=\"true\" style=\"position:relative;\"></iframe></div>";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Refresh();
+        types = await TypesOfAggregatorCars.GetTypesOfCarsAsync(aggregator);
+    }
+
+    protected async Task Refresh()
+    {
+        simulators = await SimulatorService.GetSimulatorAsync(search);
+        reserved.Clear();
+        reservedColor.Clear();
+        foreach (var item in simulators)
+        {
+            reserved.Add(item.Id, "unlocked");
+            reservedColor.Add(item.Id, "warning");
+        }
+
+    }
+
+    protected void ViewFrom(int id)
+    {
+        if (simulators != null)
+            map = simulators.Single(s => s.Id == id).FromYandex;
+    }
+    protected void ViewTo(int id)
+    {
+        if (simulators != null)
+            map = simulators.Single(s => s.Id == id).ToYandex;
+    }
+
+    protected void Reservation(int id)
+    {
+        if (reserved[id] == "unlocked")
+        {
+            reserved[id] = "locked";
+            reservedColor[id] = "danger";
+        }
+        else
+        {
+            reserved[id] = "unlocked";
+            reservedColor[id] = "warning";
+        }
+    }
+}
